@@ -29,9 +29,11 @@ def test_secret_hunk_is_blocked():
     assert result["policy"]["action"] == "block"
 
 
-def test_hard_turn_escalates_to_luna():
+def test_hard_turn_escalates():
     result = _run("model", "認証をトークンローテーション付きに再設計して。レースも潰して。")
     assert result["policy"]["action"] == "escalate"
+    assert "Luna" not in result["policy"]["title"]
+    assert "Muse" not in result["policy"]["detail"]
 
 
 def test_typo_stays_on_fast_parent():

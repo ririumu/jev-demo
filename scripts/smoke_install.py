@@ -50,14 +50,19 @@ def main():
             else:
                 raise RuntimeError("The installed app did not start")
             assert "Ask Jev" in page
+            assert "送る JSON" in page
             with urlopen(base + "/static/index.html", timeout=5) as response:
-                assert "Ask Jev" in response.read().decode()
+                bundled = response.read().decode()
+            assert "Ask Jev" in bundled
+            assert "返ってきた JSON" in bundled
             request = Request(base + "/api/decide", data=json.dumps({
                 "recipe": "ticket", "text": "Please refund my duplicate payment.", "mock": True,
             }).encode(), headers={"Content-Type": "application/json"})
             with urlopen(request, timeout=5) as response:
                 result = json.load(response)
             assert result["mode"] == "mock"
+            assert result["questions"]["department"]["type"] == "choice"
+            assert result["answers"]["department"]["choice"] == "billing"
             assert result["policy"]["action"] == "billing-refund"
             print("Installed CLI, bundled page, and mock API work outside the source directory.")
         finally:

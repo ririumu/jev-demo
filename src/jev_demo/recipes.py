@@ -1,4 +1,8 @@
-"""Each function is a Jev program: the questions dict, then Python ifs."""
+"""Each function is a Jev program: a questions JSON object, then Python ifs.
+
+Jev does not write prose. Send `state` plus this dict; branch on the typed
+answers that come back. The product is the JSON contract, not the browser UI.
+"""
 
 from __future__ import annotations
 
@@ -217,21 +221,21 @@ async def tools(state: str, *, mock: bool = False) -> dict[str, Any]:
             "action": "none",
             "tone": "ok",
             "title": "ツールなし",
-            "detail": "Jev はテキスト返答で足りると判断。LLM に tool_choice=none。",
+            "detail": "Jev は、ツールを呼ばず返答だけで足りると判断しました。",
         }
     elif confidence < CHOICE_CONFIDENCE or NO < needs < YES:
         policy = {
             "action": "passthrough",
             "tone": "warn",
             "title": "パススルー",
-            "detail": "自信が足りないのでリクエストは無改変。LLM が自分で選ぶ。",
+            "detail": "確信度が足りないので、こちらではツールを固定しません。",
         }
     else:
         policy = {
             "action": "forced",
             "tone": "ok",
-            "title": f"forced → {tool}",
-            "detail": "ツールは Jev、引数（パスやコマンド）は LLM。jev-gateway の forced モード。",
+            "title": f"次のツール → {tool}",
+            "detail": "次に使うツールは Jev が選びます。パスやコマンドなどの引数は、生成する側に残します。",
         }
 
     return {"questions": questions, "answers": answers, "policy": policy, **meta}
@@ -371,9 +375,9 @@ async def model(state: str, *, mock: bool = False) -> dict[str, Any]:
             "type": "choice",
             "instructions": "Which model tier should handle this coding turn?",
             "criteria": {
-                "fast": "Typos, renames, color tweaks, summaries, trivial edits. Muse Spark is enough.",
-                "balanced": "Normal feature or bug work with a clear shape. Mid-tier model.",
-                "strong": "Hard debugging, design, races, security, or ambiguous architecture. Luna-class.",
+                "fast": "Typos, renames, color tweaks, summaries, trivial edits. A cheap model is enough.",
+                "balanced": "Normal feature or bug work with a clear shape. A mid-tier model.",
+                "strong": "Hard debugging, design, races, security, or ambiguous architecture. Needs a strong model.",
             },
         },
         "is_hard": {
@@ -416,28 +420,28 @@ async def model(state: str, *, mock: bool = False) -> dict[str, Any]:
     tier = answers["tier"]["choice"]
     confidence = answers["tier"]["confidence"]
     hard = answers["is_hard"]["noul"]
-    label = {"fast": "Muse Spark", "balanced": "mid-tier", "strong": "Luna"}.get(tier, tier)
+    label = {"fast": "速いモデル", "balanced": "標準のモデル", "strong": "強いモデル"}.get(tier, tier)
 
     if hard >= YES or tier == "strong":
         policy = {
             "action": "escalate",
             "tone": "warn",
-            "title": "escalate → Luna",
-            "detail": "親（Muse）は維持。強い子エージェントにだけ上げる。",
+            "title": "強いモデルへ上げる",
+            "detail": "このターンは難しいので、安いモデルのままにはしません。",
         }
     elif confidence < CHOICE_CONFIDENCE or NO < hard < YES:
         policy = {
             "action": "stay",
             "tone": "ok",
-            "title": "stay（不確実）",
-            "detail": "Jev が確信していないので親モデルのまま。fail-open。",
+            "title": "このまま（不確実）",
+            "detail": "Jev が確信していないので、モデルは切り替えません。",
         }
     else:
         policy = {
             "action": "stay",
             "tone": "ok",
-            "title": f"stay → {label}",
-            "detail": "安い sticky 親のまま。キャッシュを温め続ける。",
+            "title": f"このまま（{label}）",
+            "detail": "いまのモデルで足りる、という判定です。",
         }
 
     return {"questions": questions, "answers": answers, "policy": policy, **meta}
@@ -455,7 +459,7 @@ RECIPES = {
         "id": "ticket",
         "title": "サポート振り分け",
         "kicker": "Choice + Score + Noul",
-        "blurb": "問い合わせを部署に振り、緊急度と人間対応の要否を同時に見る。Jev は判定だけ返し、ルーティングは Python が決める。",
+        "blurb": "問い合わせを部署・緊急度・返金の希望として JSON で聞き、振り分けは Python の閾値が決めます。Jev は文章を書きません。",
         "placeholder": "顧客からのメールを貼る…",
         "samples": [
             {
@@ -479,8 +483,8 @@ RECIPES = {
     "tools": {
         "id": "tools",
         "title": "コーディングエージェントのツール選択",
-        "kicker": "OpenCode 風",
-        "blurb": "jev-gateway がやっていることの縮小版。次に呼ぶツールを Jev が選び、引数は LLM に残す、という分担を体感する。",
+        "kicker": "Choice + Noul",
+        "blurb": "次に呼ぶツールを Jev が JSON で選びます。パスやコマンドなどの引数は、文章を書く側のモデルに残します。",
         "placeholder": "エージェントへの指示を書く…",
         "samples": [
             {"label": "README を読む", "text": "このリポジトリの README を読んで、セットアップ手順を要約して。"},
@@ -492,8 +496,8 @@ RECIPES = {
     "review": {
         "id": "review",
         "title": "差分ゲート",
-        "kicker": "レビュー判定",
-        "blurb": "パッチを読んでリスク・秘密情報・テスト不足を並列に見る。ブロックするか通すかは閾値を書いたコード側。",
+        "kicker": "Choice + Score + Noul",
+        "blurb": "差分をリスク・秘密情報・テスト不足として並列に聞きます。通すか止めるかは、返ってきた JSON を読むコード側です。",
         "placeholder": "git diff のハンクを貼る…",
         "samples": [
             {
@@ -512,9 +516,9 @@ RECIPES = {
     },
     "model": {
         "id": "model",
-        "title": "モデル階層ルーティング",
-        "kicker": "OpenCode Go",
-        "blurb": "opencode-jev-orchestrator の縮図。普段は Muse、難しいターンだけ Luna に上げる判定を Jev に任せる。",
+        "title": "モデルの切り替え",
+        "kicker": "Choice + Noul",
+        "blurb": "いまの依頼が安く済むか、強いモデルへ上げるかを JSON で判定します。切り替えるかどうかは、返ってきた値を読むコードが決めます。",
         "placeholder": "今のターンの依頼を書く…",
         "samples": [
             {"label": "変数名", "text": "src/main.py の変数名 typo を直して。cnt を count にして。"},
@@ -532,20 +536,7 @@ async def public_recipes() -> list[dict[str, Any]]:
     out = []
     for recipe_id, chrome in RECIPES.items():
         preview = await RUNNERS[recipe_id]("catalog-preview", mock=True)
-        out.append(
-            {
-                **chrome,
-                "questions": [
-                    {
-                        "id": key,
-                        "type": spec["type"],
-                        "instructions": spec["instructions"],
-                        "criteria": spec.get("criteria"),
-                    }
-                    for key, spec in preview["questions"].items()
-                ],
-            }
-        )
+        out.append({**chrome, "questions": preview["questions"]})
     return out
 
 

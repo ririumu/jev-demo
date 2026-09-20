@@ -57,7 +57,6 @@ async def decide_route(body: DecideBody) -> dict:
         result = await run(body.recipe, text, mock=use_mock)
     except Exception as exc:  # noqa: BLE001 — surface SDK/network errors to the UI
         raise HTTPException(status_code=502, detail=str(exc)) from exc
-    result.pop("questions", None)
     return result
 
 

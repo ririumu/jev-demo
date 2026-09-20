@@ -166,6 +166,17 @@
     .opt { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
     .empty { color: var(--muted); line-height: 1.6; }
     .err { color: var(--bad); font-size: 13px; margin-top: 10px; }
+    pre.json {
+      margin: 0 0 14px;
+      padding: 12px;
+      background: #0e1116;
+      border: 1px solid var(--line);
+      font-size: 11px;
+      line-height: 1.45;
+      overflow: auto;
+      max-height: 320px;
+      white-space: pre;
+    }
     @media (max-width: 1100px) {
       main { grid-template-columns: 1fr; }
       aside, .stage { border-right: 0; border-bottom: 1px solid var(--line); }
@@ -176,7 +187,7 @@
   <header>
     <div class="brand">
       <h1>JEV DEMO</h1>
-      <span>文章は書かない。判定だけ返す。</span>
+      <span>文章は生成しません。返すのは JSON です。</span>
     </div>
     <div class="pills">
       <div class="pill" id="key-pill">KEY …</div>
@@ -185,25 +196,25 @@
   </header>
   <main>
     <aside>
-      <h2>Recipes</h2>
+      <h2>レシピ</h2>
       <div id="recipes"></div>
       <p class="blurb" id="blurb"></p>
-      <h2>Jev に聞くこと</h2>
-      <div class="qs" id="questions"></div>
+      <h2>送る JSON</h2>
+      <pre class="json mono" id="questions-json"></pre>
       <div class="keybox">
         <h2>接続</h2>
-        <p class="blurb" id="op-status" style="margin-top:0">認証情報を確認しています…</p>
+        <p class="blurb" id="op-status" style="margin-top:0">接続を確認しています…</p>
         <div class="row">
           <button class="ghost" id="reload-key" type="button">再読み込み</button>
           <label class="mono" style="font-size:12px;color:var(--muted)">
-            <input type="checkbox" id="force-mock" /> 強制モック
+            <input type="checkbox" id="force-mock" /> モックで試す
           </label>
         </div>
       </div>
     </aside>
     <section class="stage">
-      <h2>State</h2>
-      <textarea id="text" placeholder="ここに状態を貼る"></textarea>
+      <h2>state</h2>
+      <textarea id="text" placeholder="判定してほしい状態を貼ってください"></textarea>
       <div class="samples" id="samples"></div>
       <div class="row">
         <button class="go" id="run" type="button">Ask Jev</button>
@@ -212,8 +223,8 @@
       <div class="err" id="err"></div>
     </section>
     <section>
-      <h2>Answers + policy</h2>
-      <div id="out" class="empty">まだ何も聞いていない。左のレシピを選んでサンプルを押し、Ask Jev。</div>
+      <h2>answers と分岐</h2>
+      <div id="out" class="empty">まだ質問していません。左のレシピを選び、サンプルを置いてから Ask Jev を押してください。</div>
     </section>
   </main>
   <script>
@@ -222,9 +233,13 @@
     let current = null;
     let hasKey = false;
 
-    const typeColor = { choice: "CHOICE", score: "SCORE", noul: "NOUL" };
-
     function pct(n) { return Math.round(Number(n) * 100); }
+
+    function escapeHtml(text) {
+      return String(text).replace(/[&<>"]/g, (ch) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;",
+      }[ch]));
+    }
 
     async function load() {
       const [st, rec] = await Promise.all([
@@ -248,13 +263,12 @@
 
     function applyKey(key) {
       hasKey = !!key.present;
-      const source = { "1password": "1PASSWORD", env: "ENV", opencode: "OPENCODE" }[key.source] || "NO KEY";
-      $("key-pill").textContent = source;
+      $("key-pill").textContent = hasKey ? "キーあり" : "キーなし";
       $("mode-pill").textContent = hasKey ? "LIVE" : "MOCK";
       $("mode-pill").className = "pill " + (hasKey ? "live" : "mock");
       const bits = [`${key.provider} / ${key.model}`];
-      if (hasKey) bits.push(key.detail || "キーを読み込みました。");
-      else bits.push("キーが見つからないためモックで動作します。", key.detail || "");
+      if (hasKey) bits.push("実際の Jev に接続します。");
+      else bits.push("キーがないため、同じ形の JSON をモックが返します。");
       $("op-status").textContent = bits.join(" ");
     }
 
@@ -265,12 +279,7 @@
       }
       $("blurb").textContent = current.blurb;
       $("text").placeholder = current.placeholder;
-      $("questions").innerHTML = current.questions.map((q) => `
-        <div class="q">
-          <div class="t mono">${typeColor[q.type] || q.type}</div>
-          <div><b>${q.id}</b> — ${q.instructions}</div>
-        </div>
-      `).join("");
+      $("questions-json").textContent = JSON.stringify(current.questions, null, 2);
       $("samples").innerHTML = current.samples.map((s, i) =>
         `<button class="chip" type="button" data-i="${i}">${s.label}</button>`
       ).join("");
@@ -318,6 +327,7 @@
 
     function render(result) {
       const p = result.policy;
+      const payload = { questions: result.questions, answers: result.answers };
       const cards = Object.entries(result.answers).map(([id, a]) => {
         if (a.type === "noul") return renderNoul(id, a);
         if (a.type === "choice") return renderChoice(id, a);
@@ -326,16 +336,18 @@
       }).join("");
       $("out").innerHTML = `
         <div class="verdict ${p.tone}">
-          <h3>${p.title}</h3>
-          <p>${p.detail}</p>
+          <h3>${escapeHtml(p.title)}</h3>
+          <p>${escapeHtml(p.detail)}</p>
         </div>
         <div class="meta mono">
-          <span>${result.mode}</span>
-          <span>${result.model}</span>
+          <span>${escapeHtml(result.mode)}</span>
+          <span>${escapeHtml(result.model)}</span>
           <span>${result.elapsed_ms} ms</span>
           <span>${result.usage.input_tokens} in tok</span>
           <span>${result.usage.usd == null ? "料金未設定" : `$${Number(result.usage.usd).toFixed(6)}（概算）`}</span>
         </div>
+        <h2>返ってきた JSON</h2>
+        <pre class="json mono">${escapeHtml(JSON.stringify(payload, null, 2))}</pre>
         ${cards}
       `;
       $("mode-pill").textContent = result.mode.toUpperCase();
@@ -345,7 +357,7 @@
     $("run").onclick = async () => {
       $("err").textContent = "";
       const text = $("text").value.trim();
-      if (!text) { $("err").textContent = "state が空"; return; }
+      if (!text) { $("err").textContent = "state が空です。"; return; }
       $("run").disabled = true;
       $("hint").textContent = "Jev に聞いています…";
       try {
