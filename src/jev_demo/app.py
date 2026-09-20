@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import os
+import argparse
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -64,6 +64,8 @@ async def decide_route(body: DecideBody) -> dict:
 def main() -> None:
     import uvicorn
 
-    os.chdir(Path(__file__).resolve().parents[2])
-    print(f"Jev demo → http://{HOST}:{PORT}")
-    uvicorn.run("jev_demo.app:app", host=HOST, port=PORT, reload=False)
+    parser = argparse.ArgumentParser(description="Try Jev in a local browser.")
+    parser.add_argument("--port", type=int, default=PORT, help="Local port (default: 8765)")
+    args = parser.parse_args()
+    print(f"Jev demo: http://{HOST}:{args.port}")
+    uvicorn.run("jev_demo.app:app", host=HOST, port=args.port, reload=False)

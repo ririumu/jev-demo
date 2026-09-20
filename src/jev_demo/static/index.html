@@ -191,8 +191,8 @@
       <h2>Jev に聞くこと</h2>
       <div class="qs" id="questions"></div>
       <div class="keybox">
-        <h2>1Password</h2>
-        <p class="blurb" id="op-status" style="margin-top:0">キーは 1Password のアイテム <code>TypeSafe</code> から読む。ディスクには書かない。</p>
+        <h2>接続</h2>
+        <p class="blurb" id="op-status" style="margin-top:0">認証情報を確認しています…</p>
         <div class="row">
           <button class="ghost" id="reload-key" type="button">再読み込み</button>
           <label class="mono" style="font-size:12px;color:var(--muted)">
@@ -248,15 +248,13 @@
 
     function applyKey(key) {
       hasKey = !!key.present;
-      const source = key.source === "1password" ? "1PASSWORD" : (key.source === "env" ? "OP RUN" : "NO KEY");
+      const source = { "1password": "1PASSWORD", env: "ENV", opencode: "OPENCODE" }[key.source] || "NO KEY";
       $("key-pill").textContent = source;
       $("mode-pill").textContent = hasKey ? "LIVE" : "MOCK";
       $("mode-pill").className = "pill " + (hasKey ? "live" : "mock");
-      const bits = [];
-      if (!key.cli) bits.push("CLI (op) が入っていない。");
-      else if (!hasKey) bits.push(key.detail || "アイテム TypeSafe を読めない。");
-      else bits.push(key.detail || "1Password から読んだ。");
-      bits.push("ディスクには書かない。");
+      const bits = [`${key.provider} / ${key.model}`];
+      if (hasKey) bits.push(key.detail || "キーを読み込みました。");
+      else bits.push("キーが見つからないためモックで動作します。", key.detail || "");
       $("op-status").textContent = bits.join(" ");
     }
 
@@ -336,7 +334,7 @@
           <span>${result.model}</span>
           <span>${result.elapsed_ms} ms</span>
           <span>${result.usage.input_tokens} in tok</span>
-          <span>$${Number(result.usage.usd).toFixed(6)}</span>
+          <span>${result.usage.usd == null ? "料金未設定" : `$${Number(result.usage.usd).toFixed(6)}（概算）`}</span>
         </div>
         ${cards}
       `;
