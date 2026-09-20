@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Jev Demo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+JP:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0b0d10;
+      --bg-2: #12151b;
+      --line: #232833;
+      --ink: #e8eadf;
+      --muted: #8b9284;
+      --lime: #d6ff3c;
+      --lime-dim: #8aa326;
+      --blue: #7aa2ff;
+      --warn: #ffb45a;
+      --bad: #ff5c7a;
+      --ok: #9dff7a;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      font-family: "IBM Plex Sans JP", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(1200px 500px at 10% -10%, #1a2410 0%, transparent 55%),
+        radial-gradient(900px 400px at 110% 0%, #142033 0%, transparent 50%),
+        var(--bg);
+      color: var(--ink);
+    }
+    button, input, textarea, select { font: inherit; color: inherit; }
+    code, .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 18px 22px;
+      border-bottom: 1px solid var(--line);
+    }
+    .brand { display: flex; align-items: baseline; gap: 12px; }
+    .brand h1 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: 0.08em;
+      font-weight: 600;
+    }
+    .brand span { color: var(--muted); font-size: 12px; }
+    .pills { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .pill {
+      border: 1px solid var(--line);
+      background: var(--bg-2);
+      padding: 4px 10px;
+      font-size: 11px;
+      letter-spacing: 0.04em;
+    }
+    .pill.live { border-color: var(--lime-dim); color: var(--lime); }
+    .pill.mock { border-color: #3d3a20; color: var(--warn); }
+    main {
+      display: grid;
+      grid-template-columns: 280px 1fr 1fr;
+      min-height: calc(100vh - 61px);
+    }
+    aside, section { padding: 18px; }
+    aside { border-right: 1px solid var(--line); }
+    .stage { border-right: 1px solid var(--line); }
+    h2 {
+      margin: 0 0 10px;
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 500;
+    }
+    .recipe {
+      width: 100%;
+      text-align: left;
+      background: transparent;
+      border: 1px solid transparent;
+      padding: 10px 10px;
+      margin: 0 0 6px;
+      cursor: pointer;
+    }
+    .recipe:hover { border-color: var(--line); background: #161a21; }
+    .recipe.active { border-color: var(--lime-dim); background: #161c10; }
+    .recipe b { display: block; font-weight: 500; }
+    .recipe small { color: var(--muted); }
+    .blurb { color: var(--muted); font-size: 13px; line-height: 1.55; margin: 14px 0; }
+    .qs { display: flex; flex-direction: column; gap: 8px; }
+    .q {
+      border: 1px solid var(--line);
+      padding: 8px 10px;
+      background: #10131a;
+      font-size: 12px;
+    }
+    .q .t { color: var(--lime); letter-spacing: 0.08em; font-size: 10px; }
+    textarea {
+      width: 100%;
+      min-height: 180px;
+      background: #0e1116;
+      border: 1px solid var(--line);
+      padding: 12px;
+      resize: vertical;
+      line-height: 1.5;
+    }
+    .samples { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 14px; }
+    .chip, .go, .ghost {
+      border: 1px solid var(--line);
+      background: #161a21;
+      padding: 6px 10px;
+      cursor: pointer;
+    }
+    .chip:hover { border-color: var(--lime-dim); }
+    .go {
+      background: var(--lime);
+      color: #111;
+      border-color: var(--lime);
+      font-weight: 600;
+      padding: 8px 16px;
+    }
+    .go:disabled { opacity: 0.5; cursor: wait; }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .keybox { margin-top: 18px; }
+    .keybox input {
+      width: 100%;
+      background: #0e1116;
+      border: 1px solid var(--line);
+      padding: 8px 10px;
+      margin: 6px 0;
+    }
+    .verdict {
+      border: 1px solid var(--line);
+      padding: 16px;
+      margin-bottom: 14px;
+      background: #10150e;
+    }
+    .verdict.warn { background: #1a140c; border-color: #5a4020; }
+    .verdict.bad { background: #1a0e12; border-color: #5a2030; }
+    .verdict h3 { margin: 0 0 6px; font-size: 22px; font-weight: 600; }
+    .verdict p { margin: 0; color: var(--muted); }
+    .meta { display: flex; gap: 10px; flex-wrap: wrap; margin: 12px 0 16px; color: var(--muted); font-size: 12px; }
+    .card {
+      border: 1px solid var(--line);
+      padding: 12px;
+      margin-bottom: 10px;
+      background: var(--bg-2);
+    }
+    .card header {
+      padding: 0 0 8px;
+      border: 0;
+      display: flex;
+      justify-content: space-between;
+    }
+    .bar {
+      display: flex;
+      height: 8px;
+      background: #0b0d10;
+      border: 1px solid var(--line);
+      margin: 6px 0;
+      overflow: hidden;
+    }
+    .bar > i { display: block; height: 100%; background: var(--lime); }
+    .opt { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+    .empty { color: var(--muted); line-height: 1.6; }
+    .err { color: var(--bad); font-size: 13px; margin-top: 10px; }
+    @media (max-width: 1100px) {
+      main { grid-template-columns: 1fr; }
+      aside, .stage { border-right: 0; border-bottom: 1px solid var(--line); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <h1>JEV DEMO</h1>
+      <span>文章は書かない。判定だけ返す。</span>
+    </div>
+    <div class="pills">
+      <div class="pill" id="key-pill">KEY …</div>
+      <div class="pill mock" id="mode-pill">MOCK</div>
+    </div>
+  </header>
+  <main>
+    <aside>
+      <h2>Recipes</h2>
+      <div id="recipes"></div>
+      <p class="blurb" id="blurb"></p>
+      <h2>Jev に聞くこと</h2>
+      <div class="qs" id="questions"></div>
+      <div class="keybox">
+        <h2>TypeSafe key</h2>
+        <input id="key" type="password" placeholder="sk-… または TYPESAFE_API_KEY" autocomplete="off" />
+        <div class="row">
+          <button class="ghost" id="save-key" type="button">キーを保存</button>
+          <label class="mono" style="font-size:12px;color:var(--muted)">
+            <input type="checkbox" id="force-mock" /> 強制モック
+          </label>
+        </div>
+        <p class="blurb" style="margin-top:8px">ローカルの <code>.env</code> に書くだけ。127.0.0.1 以外には出ない。</p>
+      </div>
+    </aside>
+    <section class="stage">
+      <h2>State</h2>
+      <textarea id="text" placeholder="ここに状態を貼る"></textarea>
+      <div class="samples" id="samples"></div>
+      <div class="row">
+        <button class="go" id="run" type="button">Ask Jev</button>
+        <span class="mono" id="hint" style="color:var(--muted);font-size:12px"></span>
+      </div>
+      <div class="err" id="err"></div>
+    </section>
+    <section>
+      <h2>Answers + policy</h2>
+      <div id="out" class="empty">まだ何も聞いていない。左のレシピを選んでサンプルを押し、Ask Jev。</div>
+    </section>
+  </main>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let recipes = [];
+    let current = null;
+    let hasKey = false;
+
+    const typeColor = { choice: "CHOICE", score: "SCORE", noul: "NOUL" };
+
+    function pct(n) { return Math.round(Number(n) * 100); }
+
+    async function load() {
+      const [st, rec] = await Promise.all([
+        fetch("/api/status").then((r) => r.json()),
+        fetch("/api/recipes").then((r) => r.json()),
+      ]);
+      hasKey = !!st.key.present;
+      $("key-pill").textContent = hasKey ? `KEY ${st.key.hint}` : "KEY missing";
+      $("mode-pill").textContent = hasKey ? "LIVE" : "MOCK";
+      $("mode-pill").className = "pill " + (hasKey ? "live" : "mock");
+      recipes = rec.recipes;
+      $("recipes").innerHTML = recipes.map((r) => `
+        <button class="recipe" data-id="${r.id}" type="button">
+          <b>${r.title}</b>
+          <small>${r.kicker}</small>
+        </button>
+      `).join("");
+      $("recipes").onclick = (e) => {
+        const btn = e.target.closest(".recipe");
+        if (btn) select(btn.dataset.id);
+      };
+      select(recipes[0].id);
+    }
+
+    function select(id) {
+      current = recipes.find((r) => r.id === id);
+      for (const el of document.querySelectorAll(".recipe")) {
+        el.classList.toggle("active", el.dataset.id === id);
+      }
+      $("blurb").textContent = current.blurb;
+      $("text").placeholder = current.placeholder;
+      $("questions").innerHTML = current.questions.map((q) => `
+        <div class="q">
+          <div class="t mono">${typeColor[q.type] || q.type}</div>
+          <div><b>${q.id}</b> — ${q.instructions}</div>
+        </div>
+      `).join("");
+      $("samples").innerHTML = current.samples.map((s, i) =>
+        `<button class="chip" type="button" data-i="${i}">${s.label}</button>`
+      ).join("");
+      $("samples").onclick = (e) => {
+        const btn = e.target.closest(".chip");
+        if (!btn) return;
+        $("text").value = current.samples[Number(btn.dataset.i)].text;
+      };
+    }
+
+    function renderNoul(id, a) {
+      const yes = a.noul >= 0.5;
+      return `
+        <div class="card">
+          <header><b>${id}</b><span class="mono">${yes ? "YES" : "NO"} · ${a.noul.toFixed(2)}</span></header>
+          <div class="bar"><i style="width:${pct(a.noul)}%;background:${yes ? "var(--lime)" : "var(--muted)"}"></i></div>
+          <div class="opt"><span>no</span><span>yes</span></div>
+        </div>`;
+    }
+
+    function renderChoice(id, a) {
+      const entries = Object.entries(a.probabilities || {}).sort((x, y) => y[1] - x[1]);
+      return `
+        <div class="card">
+          <header><b>${id}</b><span class="mono">${a.choice} · conf ${Number(a.confidence).toFixed(2)}</span></header>
+          ${entries.map(([k, v]) => `
+            <div class="opt"><span>${k}</span><span class="mono">${Number(v).toFixed(2)}</span></div>
+            <div class="bar"><i style="width:${pct(v)}%;background:${k === a.choice ? "var(--lime)" : "var(--blue)"}"></i></div>
+          `).join("")}
+        </div>`;
+    }
+
+    function renderScore(id, a) {
+      const legend = a.legend || {};
+      const entries = Object.entries(a.probabilities || {}).sort((x, y) => Number(x[0]) - Number(y[0]));
+      return `
+        <div class="card">
+          <header><b>${id}</b><span class="mono">score ${Number(a.score).toFixed(2)} · conf ${Number(a.confidence).toFixed(2)}</span></header>
+          ${entries.map(([k, v]) => `
+            <div class="opt"><span>${k}: ${legend[k] || ""}</span><span class="mono">${Number(v).toFixed(2)}</span></div>
+            <div class="bar"><i style="width:${pct(v)}%"></i></div>
+          `).join("")}
+        </div>`;
+    }
+
+    function render(result) {
+      const p = result.policy;
+      const cards = Object.entries(result.answers).map(([id, a]) => {
+        if (a.type === "noul") return renderNoul(id, a);
+        if (a.type === "choice") return renderChoice(id, a);
+        if (a.type === "score") return renderScore(id, a);
+        return `<div class="card">${id}</div>`;
+      }).join("");
+      $("out").innerHTML = `
+        <div class="verdict ${p.tone}">
+          <h3>${p.title}</h3>
+          <p>${p.detail}</p>
+        </div>
+        <div class="meta mono">
+          <span>${result.mode}</span>
+          <span>${result.model}</span>
+          <span>${result.elapsed_ms} ms</span>
+          <span>${result.usage.input_tokens} in tok</span>
+          <span>$${Number(result.usage.usd).toFixed(6)}</span>
+        </div>
+        ${cards}
+      `;
+      $("mode-pill").textContent = result.mode.toUpperCase();
+      $("mode-pill").className = "pill " + (result.mode === "live" ? "live" : "mock");
+    }
+
+    $("run").onclick = async () => {
+      $("err").textContent = "";
+      const text = $("text").value.trim();
+      if (!text) { $("err").textContent = "state が空"; return; }
+      $("run").disabled = true;
+      $("hint").textContent = "Jev に聞いています…";
+      try {
+        const res = await fetch("/api/decide", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            recipe: current.id,
+            text,
+            mock: $("force-mock").checked ? true : null,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || res.statusText);
+        render(data);
+      } catch (e) {
+        $("err").textContent = e.message;
+      } finally {
+        $("run").disabled = false;
+        $("hint").textContent = "";
+      }
+    };
+
+    $("save-key").onclick = async () => {
+      $("err").textContent = "";
+      try {
+        const res = await fetch("/api/key", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ api_key: $("key").value }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "key failed");
+        $("key").value = "";
+        hasKey = true;
+        $("key-pill").textContent = `KEY ${data.key.hint}`;
+        $("mode-pill").textContent = "LIVE";
+        $("mode-pill").className = "pill live";
+      } catch (e) {
+        $("err").textContent = e.message;
+      }
+    };
+
+    load().catch((e) => { $("err").textContent = e.message; });
+  </script>
+</body>
+</html>
