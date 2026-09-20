@@ -12,7 +12,6 @@ license-files = ["LICENSE"]
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115",
-    "python-dotenv>=1.0",
     "typesafe-sdk>=0.7.0",
     "uvicorn[standard]>=0.32",
 ]

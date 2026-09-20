@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from jev_demo.client import key_status, save_key
+from jev_demo.client import key_status, reload_key
 from jev_demo.recipes import RECIPES, public_recipes, run
 
 STATIC = Path(__file__).parent / "static"
@@ -23,10 +23,6 @@ class DecideBody(BaseModel):
     recipe: str
     text: str = Field(min_length=1)
     mock: bool | None = None
-
-
-class KeyBody(BaseModel):
-    api_key: str = Field(min_length=4)
 
 
 @app.get("/")
@@ -44,10 +40,9 @@ async def recipes() -> dict:
     return {"recipes": await public_recipes()}
 
 
-@app.post("/api/key")
-def put_key(body: KeyBody) -> dict:
-    save_key(body.api_key)
-    return {"ok": True, "key": key_status()}
+@app.post("/api/key/reload")
+def put_key_reload() -> dict:
+    return {"ok": True, "key": reload_key()}
 
 
 @app.post("/api/decide")

@@ -1,78 +1,126 @@
-"""TypeSafe key + one System One call. Questions are wire dicts."""
+"""TypeSafe key from 1Password, then one System One call. Nothing is written to disk."""
 
 from __future__ import annotations
 
+import glob
 import os
+import shutil
+import subprocess
+import sys
 import time
-from pathlib import Path
 from typing import Any
 
-from dotenv import load_dotenv
-
-ROOT = Path(__file__).resolve().parents[2]
-ENV_PATH = ROOT / ".env"
 INPUT_PRICE_PER_MILLION = 0.042
-
-KEY_CANDIDATES = [
-    ENV_PATH,
-    Path.home() / ".config" / "opencode" / "opencode-jev-orchestrator.key",
-    Path.home() / ".config" / "opencode" / ".env",
-    Path.home() / ".jev-gateway" / ".env",
-]
+DEFAULT_ITEM = "TypeSafe"
+_CACHE: dict[str, str] = {}
 
 
-def _parse_env_text(text: str) -> str | None:
-    stripped = text.strip()
-    if not stripped:
-        return None
-    if "\n" not in stripped and "=" not in stripped:
-        return stripped
-    for line in stripped.splitlines():
-        line = line.strip()
-        if not line or line.startswith("#"):
-            continue
-        if line.startswith(("TYPESAFE_API_KEY=", "JEV_KEY=", "JEV_API_KEY=")):
-            value = line.split("=", 1)[1].strip().strip('"').strip("'")
-            if value:
-                return value
+def _op_bin() -> str | None:
+    found = shutil.which("op")
+    if found:
+        return found
+    home = os.path.expanduser("~")
+    localapp = os.environ.get("LOCALAPPDATA", "")
+    candidates = [
+        os.path.join(localapp, "Microsoft", "WinGet", "Links", "op.exe"),
+        os.path.join(os.environ.get("ProgramFiles", ""), "1Password CLI", "op.exe"),
+        os.path.join(home, "AppData", "Local", "1Password CLI", "op.exe"),
+        *glob.glob(os.path.join(localapp, "Microsoft", "WinGet", "Packages", "AgileBits.1Password.CLI*", "op.exe")),
+    ]
+    for path in candidates:
+        if path and os.path.isfile(path):
+            return path
     return None
 
 
+def _op(args: list[str], timeout: float = 45) -> tuple[int, str, str]:
+    binary = _op_bin()
+    if not binary:
+        return 127, "", "1Password CLI (op) is not installed"
+    kwargs: dict[str, Any] = {
+        "args": [binary, *args],
+        "capture_output": True,
+        "text": True,
+        "timeout": timeout,
+        "check": False,
+    }
+    if sys.platform == "win32":
+        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+    try:
+        result = subprocess.run(**kwargs)
+    except FileNotFoundError:
+        return 127, "", "1Password CLI (op) is not installed"
+    except subprocess.TimeoutExpired:
+        return 124, "", "1Password CLI timed out (unlock the desktop app and retry)"
+    return result.returncode, (result.stdout or "").strip(), (result.stderr or "").strip()
+
+
+def _from_onepassword() -> tuple[str | None, str]:
+    """Return (secret, detail). Secret stays in this process."""
+    ref = (os.environ.get("JEV_OP_REF") or "").strip()
+    if ref.startswith("op://"):
+        code, out, err = _op(["read", ref])
+        if code == 0 and out:
+            return out, ref
+        return None, err or f"could not read {ref}"
+
+    item = (os.environ.get("JEV_OP_ITEM") or DEFAULT_ITEM).strip()
+    for field in ("credential", "password"):
+        code, out, err = _op(["item", "get", item, "--reveal", "--fields", field])
+        if code == 0 and out:
+            return out, f"op item {item}/{field}"
+        last_err = err
+    return None, last_err or f"1Password item {item!r} has no credential/password field"
+
+
 def resolve_key() -> str | None:
-    load_dotenv(ENV_PATH, override=False)
+    if "secret" in _CACHE:
+        return _CACHE["secret"]
+
     for name in ("TYPESAFE_API_KEY", "JEV_KEY", "JEV_API_KEY"):
         value = os.environ.get(name, "").strip()
-        if value:
-            return value
-    for path in KEY_CANDIDATES:
-        if not path.is_file():
+        if not value:
             continue
-        try:
-            parsed = _parse_env_text(path.read_text(encoding="utf-8"))
-        except OSError:
-            continue
-        if parsed:
-            return parsed
+        if value.startswith("op://"):
+            code, out, err = _op(["read", value])
+            if code == 0 and out:
+                _CACHE["secret"] = out
+                _CACHE["source"] = "1password"
+                _CACHE["detail"] = value
+                return out
+            _CACHE["detail"] = err or f"could not read {value}"
+            return None
+        # Injected by `op run`. Not a file we wrote.
+        _CACHE["secret"] = value
+        _CACHE["source"] = "env"
+        _CACHE["detail"] = name
+        return value
+
+    secret, detail = _from_onepassword()
+    if secret:
+        _CACHE["secret"] = secret
+        _CACHE["source"] = "1password"
+        _CACHE["detail"] = detail
+        return secret
+    _CACHE["detail"] = detail
     return None
 
 
 def key_status() -> dict[str, Any]:
-    key = resolve_key()
-    if not key:
-        return {"present": False, "hint": None, "source": None}
+    present = resolve_key() is not None
     return {
-        "present": True,
-        "hint": f"…{key[-4:]}" if len(key) >= 4 else "set",
-        "source": "env",
+        "present": present,
+        "source": _CACHE.get("source") if present else None,
+        "detail": _CACHE.get("detail"),
+        "cli": _op_bin() is not None,
+        "item": (os.environ.get("JEV_OP_ITEM") or DEFAULT_ITEM),
+        "ref": (os.environ.get("JEV_OP_REF") or "").strip() or None,
     }
 
 
-def save_key(api_key: str) -> None:
-    cleaned = api_key.strip()
-    if not cleaned:
-        raise ValueError("empty key")
-    ENV_PATH.write_text(f"TYPESAFE_API_KEY={cleaned}\n", encoding="utf-8")
-    os.environ["TYPESAFE_API_KEY"] = cleaned
+def reload_key() -> dict[str, Any]:
+    _CACHE.clear()
+    return key_status()
 
 
 def _serialize_answer(answer: Any) -> dict[str, Any]:
@@ -102,7 +150,7 @@ def _serialize_answer(answer: Any) -> dict[str, Any]:
 async def system_one(state: str, questions: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
     key = resolve_key()
     if not key:
-        raise RuntimeError("TYPESAFE_API_KEY is not set")
+        raise RuntimeError(_CACHE.get("detail") or "TypeSafe key not found in 1Password")
 
     os.environ["TYPESAFE_API_KEY"] = key
     from typesafe_sdk import AsyncTypeSafeClient

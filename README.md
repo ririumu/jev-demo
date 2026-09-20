@@ -18,14 +18,26 @@ uv run jev-demo
 
 ブラウザで http://127.0.0.1:8765
 
-キーがなくても **モック** で UI を一通り触れる。本番の Jev を使うときは TypeSafe のキーを画面に貼るか、`.env` に置く。
+キーがなくても **モック** で UI を一通り触れる。本番の Jev は 1Password から読む。`.env` には書かない。
+
+1. [1Password CLI](https://developer.1password.com/docs/cli/get-started/) を入れる
+2. デスクトップアプリの Settings → Developer → Integrate with 1Password CLI
+3. アイテム名 `TypeSafe` を API Credential（フィールド `credential`）か Login（`password`）で作る
+4. `uv run jev-demo`
+
+参照を明示するなら:
 
 ```powershell
-copy .env.example .env
-# TYPESAFE_API_KEY=... を書く
+$env:JEV_OP_REF = "op://Private/TypeSafe/credential"
+uv run jev-demo
 ```
 
-`~/.config/opencode/opencode-jev-orchestrator.key` も読む。
+または `op run` で注入する:
+
+```powershell
+$env:TYPESAFE_API_KEY = "op://Private/TypeSafe/credential"
+op run -- uv run jev-demo
+```
 
 ## レシピ
 

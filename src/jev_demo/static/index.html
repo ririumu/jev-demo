@@ -191,15 +191,14 @@
       <h2>Jev に聞くこと</h2>
       <div class="qs" id="questions"></div>
       <div class="keybox">
-        <h2>TypeSafe key</h2>
-        <input id="key" type="password" placeholder="sk-… または TYPESAFE_API_KEY" autocomplete="off" />
+        <h2>1Password</h2>
+        <p class="blurb" id="op-status" style="margin-top:0">キーは 1Password のアイテム <code>TypeSafe</code> から読む。ディスクには書かない。</p>
         <div class="row">
-          <button class="ghost" id="save-key" type="button">キーを保存</button>
+          <button class="ghost" id="reload-key" type="button">再読み込み</button>
           <label class="mono" style="font-size:12px;color:var(--muted)">
             <input type="checkbox" id="force-mock" /> 強制モック
           </label>
         </div>
-        <p class="blurb" style="margin-top:8px">ローカルの <code>.env</code> に書くだけ。127.0.0.1 以外には出ない。</p>
       </div>
     </aside>
     <section class="stage">
@@ -232,10 +231,7 @@
         fetch("/api/status").then((r) => r.json()),
         fetch("/api/recipes").then((r) => r.json()),
       ]);
-      hasKey = !!st.key.present;
-      $("key-pill").textContent = hasKey ? `KEY ${st.key.hint}` : "KEY missing";
-      $("mode-pill").textContent = hasKey ? "LIVE" : "MOCK";
-      $("mode-pill").className = "pill " + (hasKey ? "live" : "mock");
+      applyKey(st.key);
       recipes = rec.recipes;
       $("recipes").innerHTML = recipes.map((r) => `
         <button class="recipe" data-id="${r.id}" type="button">
@@ -248,6 +244,20 @@
         if (btn) select(btn.dataset.id);
       };
       select(recipes[0].id);
+    }
+
+    function applyKey(key) {
+      hasKey = !!key.present;
+      const source = key.source === "1password" ? "1PASSWORD" : (key.source === "env" ? "OP RUN" : "NO KEY");
+      $("key-pill").textContent = source;
+      $("mode-pill").textContent = hasKey ? "LIVE" : "MOCK";
+      $("mode-pill").className = "pill " + (hasKey ? "live" : "mock");
+      const bits = [];
+      if (!key.cli) bits.push("CLI (op) が入っていない。");
+      else if (!hasKey) bits.push(key.detail || "アイテム TypeSafe を読めない。");
+      else bits.push(key.detail || "1Password から読んだ。");
+      bits.push("ディスクには書かない。");
+      $("op-status").textContent = bits.join(" ");
     }
 
     function select(id) {
@@ -361,21 +371,13 @@
       }
     };
 
-    $("save-key").onclick = async () => {
+    $("reload-key").onclick = async () => {
       $("err").textContent = "";
       try {
-        const res = await fetch("/api/key", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ api_key: $("key").value }),
-        });
+        const res = await fetch("/api/key/reload", { method: "POST" });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || "key failed");
-        $("key").value = "";
-        hasKey = true;
-        $("key-pill").textContent = `KEY ${data.key.hint}`;
-        $("mode-pill").textContent = "LIVE";
-        $("mode-pill").className = "pill live";
+        if (!res.ok) throw new Error(data.detail || "reload failed");
+        applyKey(data.key);
       } catch (e) {
         $("err").textContent = e.message;
       }
